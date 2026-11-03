@@ -5,16 +5,48 @@
 <title>DRAW / RTC</title>
 <style>
 :root{color-scheme:dark;font:13px/1.5 system-ui,"Microsoft YaHei",sans-serif;color:#d7dce5;background:#101319;--line:#2a303a;--muted:#8994a5;--accent:#7dd3c5}
-*{box-sizing:border-box}body{margin:0;height:100dvh;display:grid;grid-template-rows:52px minmax(120px,1fr) auto;overflow:hidden}button,textarea,input{font:inherit;color:inherit}button{background:#202630;border:1px solid #353e4d;border-radius:5px;padding:5px 12px;cursor:pointer}button:hover{background:#303b49}button:disabled{opacity:.45;cursor:default}button:focus-visible,textarea:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}header{display:flex;align-items:center;gap:16px;padding:0 18px;border-bottom:1px solid var(--line)}.brand{font-size:15px;font-weight:650;letter-spacing:1.5px}.brand span{font-weight:400;color:var(--muted)}.spacer{flex:1}.muted{color:var(--muted)}#state{display:flex;align-items:center;gap:7px}#state:before{content:"";width:7px;height:7px;background:#8994a5;border-radius:50%}#state[data-state=connected]:before{background:#7dd3c5}#state[data-state=error]:before{background:#ef8c8c}#viewport{position:relative;min-width:0;min-height:0;overflow:hidden;touch-action:none;background:#090c11}video{width:100%;height:100%;object-fit:contain;display:block;user-select:none}#placeholder{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;color:var(--muted);pointer-events:none}#placeholder strong{font-size:22px;font-weight:450;color:#d7dce5}#hud{position:absolute;bottom:12px;left:16px;right:16px;display:flex;justify-content:space-between;gap:8px;pointer-events:none;font-size:12px;color:#97a5b6}#selection{color:var(--accent)}#terminal{border-top:1px solid var(--line);background:#151921;display:grid;grid-template-rows:36px minmax(0,1fr) 84px;height:264px;min-height:36px}#terminal.collapsed{height:36px;grid-template-rows:36px}#terminal.collapsed .terminal-body,#terminal.collapsed .editor{display:none}.terminal-bar{display:flex;align-items:center;gap:12px;padding:0 16px;border-bottom:1px solid #222a35}.terminal-bar button{font-size:12px;padding:1px 8px}#toggle{border:none;background:none;padding:0;color:var(--muted)}.terminal-body{overflow:auto;min-height:0;padding:8px 16px}#output{white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.55 Consolas,"Cascadia Code",monospace;margin:0}.editor{display:flex;gap:12px;border-top:1px solid var(--line);padding:8px 16px}textarea{resize:none;flex:1;min-width:0;background:#10141b;border:1px solid #303949;border-radius:4px;padding:7px 10px;font:13px/1.45 Consolas,monospace;tab-size:2}.editor-side{display:flex;flex-direction:column;justify-content:center;gap:3px;text-align:center}.editor-side small{font-size:10px;color:var(--muted)}#connect-form{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:#101319d9}#connect-form form{width:min(400px,90%);padding:28px;border:1px solid var(--line);background:#151921;border-radius:8px}#connect-form label{display:block;margin-bottom:8px}#token-input{width:100%;background:#101319;border:1px solid #394456;padding:8px;margin-bottom:16px;border-radius:4px}@media(max-width:640px){header{padding:0 10px;gap:9px}.brand{font-size:13px}#metrics{display:none}#terminal{height:230px}.terminal-bar{padding:0 10px}.terminal-bar .muted{display:none}#hud{font-size:10px;left:10px;right:10px}.editor{padding:8px 10px}}
+*{box-sizing:border-box}
+body{margin:0;height:100dvh;overflow:hidden}
+button,textarea,input{font:inherit;color:inherit}
+button{background:#202630;border:1px solid #353e4d;border-radius:6px;padding:5px 12px;cursor:pointer}
+button:hover{background:#303b49}button:disabled{opacity:.45;cursor:default}
+button:focus-visible,textarea:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+header{position:fixed;z-index:20;top:16px;left:16px;right:16px;display:flex;flex-wrap:wrap;align-items:start;gap:10px;pointer-events:none}
+.toolbar-group{display:flex;align-items:center;gap:12px;min-height:44px;max-width:100%;padding:7px 10px;border:1px solid #3a43505c;border-radius:10px;background:#151b24da;box-shadow:0 6px 24px #0003;backdrop-filter:blur(14px);pointer-events:auto}
+.toolbar-actions{margin-left:auto}.brand{font-size:15px;font-weight:650;letter-spacing:1.5px;white-space:nowrap}.brand span{font-weight:400;color:var(--muted)}
+.spacer{flex:1}.muted{color:var(--muted)}#metrics{font-size:12px;white-space:nowrap}
+#state{display:flex;align-items:center;gap:7px;white-space:nowrap}#state:before{content:"";width:7px;height:7px;background:#8994a5;border-radius:50%}
+#state[data-state=connected]:before{background:#7dd3c5}#state[data-state=error]:before{background:#ef8c8c}
+#viewport{position:fixed;inset:0;z-index:0;overflow:hidden;touch-action:none;background:#090c11}
+video{width:100%;height:100%;object-fit:contain;display:block;user-select:none}
+#placeholder{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;color:var(--muted);pointer-events:none}
+#placeholder strong{font-size:22px;font-weight:450;color:#d7dce5}
+#hud{position:absolute;bottom:18px;right:18px;display:flex;flex-direction:column;align-items:end;gap:6px;pointer-events:none;font-size:12px;color:#97a5b6}
+#hud span{padding:4px 8px;border-radius:5px;background:#111720a6;backdrop-filter:blur(8px)}#selection{color:var(--accent)}
+.console-open .interaction-hint{display:none}
+#terminal{position:fixed;z-index:30;left:16px;bottom:16px;width:min(620px,calc(100dvw - 32px));height:min(300px,50dvh);min-width:280px;min-height:150px;max-width:calc(100dvw - 32px);max-height:calc(100dvh - 96px);border:1px solid #3a435080;border-radius:10px;background:#151921ed;box-shadow:0 12px 40px #0006;backdrop-filter:blur(16px);display:grid;grid-template-rows:42px minmax(0,1fr) 92px;resize:both;overflow:hidden}
+#terminal.collapsed{width:220px!important;height:42px!important;min-width:0;min-height:0;grid-template-rows:42px;resize:none}
+#terminal.collapsed .terminal-body,#terminal.collapsed .editor,#terminal.collapsed .muted,#terminal.collapsed #clear{display:none}
+.terminal-bar{display:flex;align-items:center;gap:12px;padding:0 14px;border-bottom:1px solid #303a475c;cursor:grab;user-select:none;touch-action:none}
+#terminal.dragging .terminal-bar{cursor:grabbing}#terminal.collapsed .terminal-bar{border-bottom:0}
+.terminal-bar button{font-size:12px;padding:2px 8px}#toggle{border:none;background:none;padding:0;color:var(--muted)}
+.terminal-body{overflow:auto;min-height:0;padding:8px 14px}#output{white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.55 Consolas,"Cascadia Code",monospace;margin:0}
+.editor{display:flex;gap:12px;border-top:1px solid var(--line);padding:8px 14px}
+textarea{resize:none;flex:1;min-width:0;background:#10141bc9;border:1px solid #303949;border-radius:5px;padding:7px 10px;font:13px/1.45 Consolas,monospace;tab-size:2}
+.editor-side{display:flex;flex-direction:column;justify-content:center;gap:3px;text-align:center}.editor-side small{font-size:10px;color:var(--muted)}
+#connect-form{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:#101319d9}
+#connect-form form{width:min(400px,90%);padding:28px;border:1px solid var(--line);background:#151921;border-radius:8px}
+#connect-form label{display:block;margin-bottom:8px}#token-input{width:100%;background:#101319;border:1px solid #394456;padding:8px;margin-bottom:16px;border-radius:4px}
+@media(max-width:700px){header{top:12px;left:12px;right:12px;gap:8px}.toolbar-group{gap:9px;padding:6px 8px}.brand{font-size:13px}#metrics{display:none}#terminal{left:12px;bottom:12px;max-width:calc(100dvw - 24px)}.terminal-bar{padding:0 10px}.terminal-bar .muted{display:none}#hud{right:12px;bottom:68px;font-size:11px}.interaction-hint{display:none}.editor{padding:8px 10px}}
 </style>
-<header><div class="brand">DRAW <span>/ RTC</span></div><div id="state" role="status" aria-live="polite">连接中</div><span class="spacer"></span><span id="metrics" class="muted">—</span><button id="fit" disabled>适合窗口</button><button id="reconnect">重新连接</button></header>
+<header><div class="toolbar-group"><div class="brand">DRAW <span>/ RTC</span></div><div id="state" role="status" aria-live="polite">连接中</div></div><div class="toolbar-group toolbar-actions"><span id="metrics" class="muted">—</span><button id="fit" disabled>适合窗口</button><button id="console" aria-controls="terminal" aria-expanded="false">控制台</button><button id="reconnect">重新连接</button></div></header>
 <main id="viewport" aria-label="远程三维视图" tabindex="0">
   <video id="video" autoplay playsinline muted></video>
   <div id="placeholder"><strong>远程 DRAW 视图</strong><span id="hint">正在建立 WebRTC 连接…</span></div>
-  <div id="hud"><span>左键旋转 · 中键 / 右键平移 · 滚轮缩放 · 单击点选</span><span id="selection">未选择</span></div>
+  <div id="hud"><span class="interaction-hint">左键旋转 · 中键 / 右键平移 · 滚轮缩放 · 单击点选</span><span id="selection">未选择</span></div>
   <div id="connect-form"><form><label for="token-input">连接令牌</label><input id="token-input" type="password" autocomplete="off" required minlength="16"><button type="submit">连接</button></form></div>
 </main>
-<section id="terminal" aria-label="DRAW Tcl 控制台"><div class="terminal-bar"><strong>Tcl 控制台</strong><span class="muted">在服务端 DRAW 会话中执行</span><span class="spacer"></span><button id="clear">清空输出</button><button id="toggle" aria-expanded="true">收起</button></div><div class="terminal-body"><pre id="output" role="log" aria-live="polite"></pre></div><div class="editor"><textarea id="script" spellcheck="false" aria-label="Tcl 脚本" placeholder="输入 DRAW / Tcl 命令；Ctrl+Enter 执行">box demo 80 60 40
+<section id="terminal" class="collapsed" aria-label="DRAW Tcl 控制台"><div class="terminal-bar"><strong>Tcl 控制台</strong><span class="muted">在服务端 DRAW 会话中执行</span><span class="spacer"></span><button id="clear">清空输出</button><button id="toggle" aria-expanded="false">展开</button></div><div class="terminal-body"><pre id="output" role="log" aria-live="polite"></pre></div><div class="editor"><textarea id="script" spellcheck="false" aria-label="Tcl 脚本" placeholder="输入 DRAW / Tcl 命令；Ctrl+Enter 执行">box demo 80 60 40
 vdisplay -dispMode 1 demo
 vfit</textarea><div class="editor-side"><button id="run" disabled>执行</button><small>Ctrl + Enter</small></div></div></section>
 <script>
@@ -71,7 +103,16 @@ video.addEventListener('loadeddata',()=>{$('placeholder').style.display='none';}
 $('reconnect').onclick=()=>{retry=0;connect();};$('fit').onclick=()=>{try{send({type:'fit'});}catch(e){log(e.message);}};
 $('connect-form').querySelector('form').onsubmit=event=>{event.preventDefault();token=$('token-input').value.trim();const url=new URL(location.href);url.searchParams.set('token',token);history.replaceState(null,'',url);connect();};
 $('clear').onclick=()=>{$('output').textContent='';};
-$('toggle').onclick=()=>{const collapsed=$('terminal').classList.toggle('collapsed');$('toggle').textContent=collapsed?'展开':'收起';$('toggle').setAttribute('aria-expanded',String(!collapsed));};
+const terminal=$('terminal'),terminalBar=terminal.querySelector('.terminal-bar');
+function keepConsoleInView(){if(!terminal.style.top)return;const rect=terminal.getBoundingClientRect();terminal.style.left=Math.max(12,Math.min(rect.left,innerWidth-rect.width-12))+'px';terminal.style.top=Math.max(12,Math.min(rect.top,innerHeight-rect.height-12))+'px';}
+function toggleConsole(){const collapsed=terminal.classList.toggle('collapsed');document.body.classList.toggle('console-open',!collapsed);$('toggle').textContent=collapsed?'展开':'收起';for(const id of ['toggle','console'])$(id).setAttribute('aria-expanded',String(!collapsed));keepConsoleInView();}
+$('toggle').onclick=toggleConsole;$('console').onclick=toggleConsole;
+let panelDrag=null;
+terminalBar.addEventListener('pointerdown',event=>{if(event.button!==0||event.target.closest('button'))return;const rect=terminal.getBoundingClientRect();panelDrag={id:event.pointerId,x:event.clientX-rect.left,y:event.clientY-rect.top};terminalBar.setPointerCapture(event.pointerId);terminal.classList.add('dragging');});
+terminalBar.addEventListener('pointermove',event=>{if(!panelDrag||panelDrag.id!==event.pointerId)return;terminal.style.left=event.clientX-panelDrag.x+'px';terminal.style.top=event.clientY-panelDrag.y+'px';terminal.style.bottom='auto';keepConsoleInView();});
+function endPanelDrag(event){if(panelDrag?.id!==event.pointerId)return;panelDrag=null;terminal.classList.remove('dragging');if(terminalBar.hasPointerCapture(event.pointerId))terminalBar.releasePointerCapture(event.pointerId);}
+terminalBar.addEventListener('pointerup',endPanelDrag);terminalBar.addEventListener('pointercancel',endPanelDrag);
+new ResizeObserver(keepConsoleInView).observe(terminal);window.addEventListener('resize',keepConsoleInView);
 async function run(){const script=$('script').value;if(!script.trim())return;log('> '+script);try{const result=await command(script);log((result.stdout||'')+(result.stderr||'')+(result.result||''));if(result.code)log(result.errorInfo||'Tcl 返回错误');}catch(e){log(e.message);}}
 $('run').onclick=run;$('script').onkeydown=event=>{if(event.key==='Enter'&&(event.ctrlKey||event.metaKey)){event.preventDefault();run();}if(event.key==='Tab'){event.preventDefault();event.target.setRangeText('  ',event.target.selectionStart,event.target.selectionEnd,'end');}};
 function coordinates(event){const rect=viewport.getBoundingClientRect();const aspect=(video.videoWidth||rect.width)/(video.videoHeight||rect.height);let width=rect.width,height=width/aspect;if(height>rect.height){height=rect.height;width=height*aspect;}return{x:Math.max(0,Math.min(1,(event.clientX-rect.left-(rect.width-width)/2)/width)),y:Math.max(0,Math.min(1,(event.clientY-rect.top-(rect.height-height)/2)/height))};}
