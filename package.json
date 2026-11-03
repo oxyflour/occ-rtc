@@ -1,0 +1,7 @@
+{
+  "name": "occ-draw-rtc",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": { "test": "node tests/integration.cjs" },
+  "devDependencies": { "playwright": "1.62.1" }
+}

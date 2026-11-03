@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DRAW / RTC</title>
+<style>
+:root{color-scheme:dark;font:13px/1.5 system-ui,"Microsoft YaHei",sans-serif;color:#d7dce5;background:#101319;--line:#2a303a;--muted:#8994a5;--accent:#7dd3c5}
+*{box-sizing:border-box}body{margin:0;height:100dvh;display:grid;grid-template-rows:52px minmax(120px,1fr) auto;overflow:hidden}button,textarea,input{font:inherit;color:inherit}button{background:#202630;border:1px solid #353e4d;border-radius:5px;padding:5px 12px;cursor:pointer}button:hover{background:#303b49}button:disabled{opacity:.45;cursor:default}button:focus-visible,textarea:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}header{display:flex;align-items:center;gap:16px;padding:0 18px;border-bottom:1px solid var(--line)}.brand{font-size:15px;font-weight:650;letter-spacing:1.5px}.brand span{font-weight:400;color:var(--muted)}.spacer{flex:1}.muted{color:var(--muted)}#state{display:flex;align-items:center;gap:7px}#state:before{content:"";width:7px;height:7px;background:#8994a5;border-radius:50%}#state[data-state=connected]:before{background:#7dd3c5}#state[data-state=error]:before{background:#ef8c8c}#viewport{position:relative;min-width:0;min-height:0;overflow:hidden;touch-action:none;background:#090c11}video{width:100%;height:100%;object-fit:contain;display:block;user-select:none}#placeholder{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;color:var(--muted);pointer-events:none}#placeholder strong{font-size:22px;font-weight:450;color:#d7dce5}#hud{position:absolute;bottom:12px;left:16px;right:16px;display:flex;justify-content:space-between;gap:8px;pointer-events:none;font-size:12px;color:#97a5b6}#selection{color:var(--accent)}#terminal{border-top:1px solid var(--line);background:#151921;display:grid;grid-template-rows:36px minmax(0,1fr) 84px;height:264px;min-height:36px}#terminal.collapsed{height:36px;grid-template-rows:36px}#terminal.collapsed .terminal-body,#terminal.collapsed .editor{display:none}.terminal-bar{display:flex;align-items:center;gap:12px;padding:0 16px;border-bottom:1px solid #222a35}.terminal-bar button{font-size:12px;padding:1px 8px}#toggle{border:none;background:none;padding:0;color:var(--muted)}.terminal-body{overflow:auto;min-height:0;padding:8px 16px}#output{white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.55 Consolas,"Cascadia Code",monospace;margin:0}.editor{display:flex;gap:12px;border-top:1px solid var(--line);padding:8px 16px}textarea{resize:none;flex:1;min-width:0;background:#10141b;border:1px solid #303949;border-radius:4px;padding:7px 10px;font:13px/1.45 Consolas,monospace;tab-size:2}.editor-side{display:flex;flex-direction:column;justify-content:center;gap:3px;text-align:center}.editor-side small{font-size:10px;color:var(--muted)}#connect-form{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:#101319d9}#connect-form form{width:min(400px,90%);padding:28px;border:1px solid var(--line);background:#151921;border-radius:8px}#connect-form label{display:block;margin-bottom:8px}#token-input{width:100%;background:#101319;border:1px solid #394456;padding:8px;margin-bottom:16px;border-radius:4px}@media(max-width:640px){header{padding:0 10px;gap:9px}.brand{font-size:13px}#metrics{display:none}#terminal{height:230px}.terminal-bar{padding:0 10px}.terminal-bar .muted{display:none}#hud{font-size:10px;left:10px;right:10px}.editor{padding:8px 10px}}
+</style>
+<header><div class="brand">DRAW <span>/ RTC</span></div><div id="state" role="status" aria-live="polite">连接中</div><span class="spacer"></span><span id="metrics" class="muted">—</span><button id="fit" disabled>适合窗口</button><button id="reconnect">重新连接</button></header>
+<main id="viewport" aria-label="远程三维视图" tabindex="0">
+  <video id="video" autoplay playsinline muted></video>
+  <div id="placeholder"><strong>远程 DRAW 视图</strong><span id="hint">正在建立 WebRTC 连接…</span></div>
+  <div id="hud"><span>左键旋转 · 中键 / 右键平移 · 滚轮缩放 · 单击点选</span><span id="selection">未选择</span></div>
+  <div id="connect-form"><form><label for="token-input">连接令牌</label><input id="token-input" type="password" autocomplete="off" required minlength="16"><button type="submit">连接</button></form></div>
+</main>
+<section id="terminal" aria-label="DRAW Tcl 控制台"><div class="terminal-bar"><strong>Tcl 控制台</strong><span class="muted">在服务端 DRAW 会话中执行</span><span class="spacer"></span><button id="clear">清空输出</button><button id="toggle" aria-expanded="true">收起</button></div><div class="terminal-body"><pre id="output" role="log" aria-live="polite"></pre></div><div class="editor"><textarea id="script" spellcheck="false" aria-label="Tcl 脚本" placeholder="输入 DRAW / Tcl 命令；Ctrl+Enter 执行">box demo 80 60 40
+vdisplay -dispMode 1 demo
+vfit</textarea><div class="editor-side"><button id="run" disabled>执行</button><small>Ctrl + Enter</small></div></div></section>
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+const viewport=$('viewport'), video=$('video');
+let token=new URL(location.href).searchParams.get('token')||'', socket,pc,control;
+let generation=0, sequence=0, resizeTimer, reconnectTimer, retry=0;
+let pointer=null, pendingPointer=null, pointerFrame=0;
+let status={}, selected=[], lastSize='', pingSent=0, rtt=0;
+const pending=new Map();
+function log(text){const out=$('output');out.textContent=(out.textContent+text+'\n').slice(-200000);out.parentElement.scrollTop=out.parentElement.scrollHeight;}
+function state(text,kind=''){ $('state').textContent=text;$('state').dataset.state=kind; }
+function send(message){if(control?.readyState!=='open')throw Error('连接尚未就绪');if(control.bufferedAmount>262144)throw Error('发送队列繁忙，请稍后重试');control.send(JSON.stringify(message));}
+function command(script){return new Promise((resolve,reject)=>{const id=++sequence;const timer=setTimeout(()=>{pending.delete(id);reject(Error('命令仍未返回；可继续等待服务端完成。'));},120000);pending.set(id,{resolve,reject,timer});try{send({type:'command',id,script});}catch(e){clearTimeout(timer);pending.delete(id);reject(e);}});}
+function resize(){if(control?.readyState!=='open')return;const rect=viewport.getBoundingClientRect();if(rect.width<2||rect.height<2)return;const dpr=Math.min(devicePixelRatio||1,2);let width=rect.width*dpr,height=rect.height*dpr;const scale=Math.min(1,1920/width,1080/height);width=Math.max(2,Math.floor(width*scale/2)*2);height=Math.max(2,Math.floor(height*scale/2)*2);const size=width+'x'+height;if(size===lastSize)return;try{send({type:'resize',width,height});lastSize=size;}catch(e){log(e.message);}}
+new ResizeObserver(()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(resize,150);}).observe(viewport);
+function onControl(message){
+  if(message.type==='result'){const request=pending.get(message.id);if(request){clearTimeout(request.timer);pending.delete(message.id);request.resolve(message);}else log((message.stdout||'')+(message.stderr||'')+(message.result||''));}
+  else if(message.type==='error'){log('错误：'+message.message);const request=pending.get(message.id);if(request){clearTimeout(request.timer);pending.delete(message.id);request.reject(Error(message.message));}}
+  else if(message.type==='selection'){selected=message.names;$('selection').textContent=selected.length?'已选择 '+selected.join(', '):'未选择';}
+  else if(message.type==='status'){status=message.data;if(status.lastError)$('hint').textContent=status.lastError;}
+  else if(message.type==='pong')rtt=Math.round(performance.now()-pingSent);
+}
+function closeConnection(){if(control){control.onclose=null;control.close();control=null;}if(pc){pc.onconnectionstatechange=null;pc.close();pc=null;}if(socket){socket.onclose=null;socket.close();socket=null;}video.srcObject=null;$('run').disabled=true;$('fit').disabled=true;for(const request of pending.values()){clearTimeout(request.timer);request.reject(Error('连接已关闭'));}pending.clear();lastSize='';pointer=null;pendingPointer=null;previousFrames=0;previousTime=performance.now();$('metrics').textContent='—';}
+function failure(text){state(text,'error');$('placeholder').style.display='flex';$('hint').textContent=text;$('run').disabled=true;$('fit').disabled=true;clearTimeout(reconnectTimer);reconnectTimer=setTimeout(connect,Math.min(10000,1000*2**retry++));}
+async function gathering(connection){if(connection.iceGatheringState==='complete')return;await new Promise((resolve,reject)=>{const timer=setTimeout(()=>{connection.removeEventListener('icegatheringstatechange',changed);reject(Error('ICE 收集超时'));},12000);function changed(){if(connection.iceGatheringState==='complete'){clearTimeout(timer);connection.removeEventListener('icegatheringstatechange',changed);resolve();}}connection.addEventListener('icegatheringstatechange',changed);});}
+function connect(){
+  clearTimeout(reconnectTimer);++generation;const current=generation;closeConnection();
+  if(!token){state('需要令牌');$('connect-form').style.display='flex';return;}
+  $('connect-form').style.display='none';state('连接中');$('placeholder').style.display='flex';$('hint').textContent='正在建立 WebRTC 连接…';
+  const port=Number(location.port||(location.protocol==='https:'?443:80))+1;
+  const url=new URL(location.href);url.protocol=location.protocol==='https:'?'wss:':'ws:';url.port=String(port);url.pathname='/';url.search='?token='+encodeURIComponent(token);url.hash='';
+  const ws=new WebSocket(url);socket=ws;
+  ws.onmessage=async event=>{try{if(current!==generation)return;const message=JSON.parse(event.data);
+    if(message.type==='ready')ws.send(JSON.stringify({type:'hello'}));
+    else if(message.type==='error')throw Error(message.message);
+    else if(message.type==='offer'){
+      const connection=new RTCPeerConnection({iceServers:[]});pc=connection;
+      connection.ontrack=event=>{video.srcObject=new MediaStream([event.track]);video.play().catch(e=>log(e.message));};
+      connection.ondatachannel=event=>{control=event.channel;control.onmessage=event=>{try{onControl(JSON.parse(event.data));}catch(e){log(e.message);}};control.onopen=()=>{if(current!==generation)return;retry=0;state('已连接','connected');$('run').disabled=false;$('fit').disabled=false;lastSize='';resize();};control.onclose=()=>{if(current===generation)failure('控制连接已断开');};};
+      connection.onconnectionstatechange=()=>{if(current!==generation)return;if(['failed','closed'].includes(connection.connectionState))failure('WebRTC 连接中断');};
+      await connection.setRemoteDescription({type:'offer',sdp:message.sdp});
+      // Mbed TLS 3.6 cannot parse fragmented ClientHello messages from newer browsers.
+      // A passive answer makes DRAW the DTLS client; both roles are valid for an answer.
+      const answer=await connection.createAnswer();answer.sdp=answer.sdp.replace(/a=setup:active/g,'a=setup:passive');
+      await connection.setLocalDescription(answer);await gathering(connection);
+      if(current===generation&&ws.readyState===WebSocket.OPEN)ws.send(JSON.stringify({type:'answer',sdp:connection.localDescription.sdp}));
+    }
+  }catch(e){log(e.message);if(current===generation)failure(e.message);}};
+  ws.onerror=()=>{if(current===generation)state('信令连接失败','error');};ws.onclose=()=>{if(current===generation)failure('信令连接已断开');};
+}
+video.addEventListener('loadeddata',()=>{$('placeholder').style.display='none';});
+$('reconnect').onclick=()=>{retry=0;connect();};$('fit').onclick=()=>{try{send({type:'fit'});}catch(e){log(e.message);}};
+$('connect-form').querySelector('form').onsubmit=event=>{event.preventDefault();token=$('token-input').value.trim();const url=new URL(location.href);url.searchParams.set('token',token);history.replaceState(null,'',url);connect();};
+$('clear').onclick=()=>{$('output').textContent='';};
+$('toggle').onclick=()=>{const collapsed=$('terminal').classList.toggle('collapsed');$('toggle').textContent=collapsed?'展开':'收起';$('toggle').setAttribute('aria-expanded',String(!collapsed));};
+async function run(){const script=$('script').value;if(!script.trim())return;log('> '+script);try{const result=await command(script);log((result.stdout||'')+(result.stderr||'')+(result.result||''));if(result.code)log(result.errorInfo||'Tcl 返回错误');}catch(e){log(e.message);}}
+$('run').onclick=run;$('script').onkeydown=event=>{if(event.key==='Enter'&&(event.ctrlKey||event.metaKey)){event.preventDefault();run();}if(event.key==='Tab'){event.preventDefault();event.target.setRangeText('  ',event.target.selectionStart,event.target.selectionEnd,'end');}};
+function coordinates(event){const rect=viewport.getBoundingClientRect();const aspect=(video.videoWidth||rect.width)/(video.videoHeight||rect.height);let width=rect.width,height=width/aspect;if(height>rect.height){height=rect.height;width=height*aspect;}return{x:Math.max(0,Math.min(1,(event.clientX-rect.left-(rect.width-width)/2)/width)),y:Math.max(0,Math.min(1,(event.clientY-rect.top-(rect.height-height)/2)/height))};}
+function pointerSend(message){try{send({type:'pointer',...message});}catch{}}
+function flushPointer(){pointerFrame=0;if(pendingPointer){pointerSend(pendingPointer);pendingPointer=null;}}
+viewport.addEventListener('contextmenu',event=>event.preventDefault());
+viewport.addEventListener('pointerdown',event=>{if(event.target!==video&&event.target!==viewport)return;if(control?.readyState!=='open')return;viewport.focus();viewport.setPointerCapture(event.pointerId);pointer={id:event.pointerId,startX:event.clientX,startY:event.clientY,moved:false,mode:event.button===0&&!event.shiftKey?'rotate':'pan'};pointerSend({action:'down',...coordinates(event)});event.preventDefault();});
+viewport.addEventListener('pointermove',event=>{if(pointer&&pointer.id!==event.pointerId)return;const point=coordinates(event);if(pointer){if(Math.hypot(event.clientX-pointer.startX,event.clientY-pointer.startY)>3)pointer.moved=true;if(!pointer.moved)return;}pendingPointer={action:pointer?pointer.mode:'hover',...point};if(!pointerFrame)pointerFrame=requestAnimationFrame(flushPointer);});
+viewport.addEventListener('pointerup',event=>{if(!pointer||pointer.id!==event.pointerId)return;flushPointer();if(!pointer.moved)pointerSend({action:'pick',add:event.ctrlKey,...coordinates(event)});pointer=null;if(viewport.hasPointerCapture(event.pointerId))viewport.releasePointerCapture(event.pointerId);});
+viewport.addEventListener('pointercancel',()=>{pointer=null;pendingPointer=null;});
+viewport.addEventListener('wheel',event=>{event.preventDefault();try{send({type:'wheel',delta:event.deltaY*(event.deltaMode===1?16:event.deltaMode===2?viewport.clientHeight:1)});}catch{}},{passive:false});
+viewport.addEventListener('dblclick',()=>{try{send({type:'fit'});}catch{}});
+let previousFrames=0,previousTime=performance.now();
+setInterval(async()=>{if(control?.readyState==='open'){pingSent=performance.now();try{send({type:'ping',id:++sequence});}catch{}}if(!pc)return;const connection=pc,current=generation;try{const statistics=await connection.getStats();if(current!==generation||connection!==pc)return;for(const report of statistics.values())if(report.type==='inbound-rtp'&&report.kind==='video'){const now=performance.now(),frames=report.framesDecoded||0;const fps=Math.max(0,Math.round((frames-previousFrames)*1000/(now-previousTime)));previousFrames=frames;previousTime=now;$('metrics').textContent=`${video.videoWidth} × ${video.videoHeight} · ${fps} fps · RTT ${rtt} ms`;}}catch{}},2000);
+window.drawrtc={command,send,connect,get status(){return status;},get selection(){return selected;},get connected(){return control?.readyState==='open';},get peer(){return pc;}};
+window.addEventListener('beforeunload',()=>{++generation;clearTimeout(reconnectTimer);closeConnection();});
+connect();
+</script>
+</html>
